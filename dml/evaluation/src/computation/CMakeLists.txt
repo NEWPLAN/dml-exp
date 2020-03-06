@@ -22,6 +22,7 @@ CUDA_ADD_EXECUTABLE(ad-census
 
 CUDA_ADD_LIBRARY(cumerge SHARED 
                 tensor_merge.cu 
+                tensor_merge.cpp
                 testcase.cpp)
 
 # 链接外部库，按需

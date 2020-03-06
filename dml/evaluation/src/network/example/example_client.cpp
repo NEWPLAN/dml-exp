@@ -14,7 +14,7 @@ int main(int argc, char *argv[])
 	}
 
 	TCPClient client;
-	client.connect_to_server(argv[1], atoi(argv[2]));
+	client.setup(argv[1], atoi(argv[2]));
 	client.start_service();
 	return 0;
 }

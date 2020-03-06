@@ -3,6 +3,8 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <functional>
+
 class TCPServer
 {
 public:
@@ -19,6 +21,8 @@ private:
     int server_socket;
     std::thread *connector_thread = nullptr;
     std::vector<std::thread *> worker_threads;
+
+    std::function<void(void)> callbacks;
 };
 
 #endif

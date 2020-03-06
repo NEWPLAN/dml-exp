@@ -23,6 +23,7 @@
 
 TCPServer::TCPServer()
 {
+    this->callbacks = []() { std::cout << "Default server callbacks after receive" << std::endl; };
     //socket打开一个 网络通讯端口，其中AF_INET:表示IPV4，SOCK_STREAM：表示面向流的传输，
     //protocol参数默认选择为0
     this->server_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -34,7 +35,7 @@ TCPServer::TCPServer()
     int on = 1;
     ::setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, (char *)&on, sizeof(on));
     ::setsockopt(server_socket, SOL_SOCKET, SO_REUSEPORT, (char *)&on, sizeof(on));
-    std::cout << "On creating server..." << std::endl;
+    std::cout << "Server has been created" << std::endl;
 }
 
 TCPServer::~TCPServer()
@@ -59,21 +60,36 @@ void TCPServer::setup(const std::string ip, short port)
         std::cerr << "Binding socket error" << std::endl;
         exit(-2);
     }
+    {
+        //listen声明sock处于监听状态，并且最多允许5个客户端处于连接等待状态
+        //如果收到更多的请求便忽略
+        if (listen(this->server_socket, 100) == -1) //add listener
+        {
+            std::cerr << "On listen error" << std::endl;
+            exit(-3);
+        }
+    }
 }
 
 void TCPServer::start_service(int service_number)
 {
-    //listen声明sock处于监听状态，并且最多允许5个客户端处于连接等待状态
-    //如果收到更多的请求便忽略
-    if (listen(this->server_socket, service_number) == -1) //add listener
-    {
-        std::cerr << "On listen error" << std::endl;
-        exit(-3);
-    }
+    // //listen声明sock处于监听状态，并且最多允许5个客户端处于连接等待状态
+    // //如果收到更多的请求便忽略
+    // if (listen(this->server_socket, service_number) == -1) //add listener
+    // {
+    //     std::cerr << "On listen error" << std::endl;
+    //     exit(-3);
+    // }
     std::cout << "On listen maximum connections: " << service_number << std::endl;
     if (connector_thread == nullptr)
     {
         connector_thread = new std::thread([this]() {
+            typedef struct 
+            {
+                std::string ip;
+                short port;
+            }ClientInfo;
+            std::vector<ClientInfo> client_groups;
             while (1)
             {
                 struct sockaddr_in client;
@@ -85,9 +101,14 @@ void TCPServer::start_service(int service_number)
                     std::cerr << "On accept error" << std::endl;
                     continue;
                 }
-                printf("get a new client,%s:%d\n", inet_ntoa(client.sin_addr), ntohs(client.sin_port));
-                std::string client_ip=std::string(inet_ntoa(client.sin_addr));
-                short client_port=ntohs(client.sin_port);
+                printf("[Server] received connection: %s:%d\n", inet_ntoa(client.sin_addr), ntohs(client.sin_port));
+                {
+                ClientInfo new_client;
+                new_client.ip=std::string(inet_ntoa(client.sin_addr));
+                new_client.port=ntohs(client.sin_port);
+                client_groups.push_back(std::move(new_client));
+                }
+                
                 worker_threads.push_back(new std::thread([this, new_fd](){
                     this->handle_request(new_fd);
                 }));
@@ -105,6 +126,7 @@ void TCPServer::handle_request(int fd)
 {
     int new_fd = fd;
     printf("new_fd=%d\n", new_fd);
+    size_t received = 0;
     while (1)
     {
         char buffer[1024 * 1024];
@@ -125,6 +147,15 @@ void TCPServer::handle_request(int fd)
         {
             printf("read done...break\n");
             break;
+        }
+        if (s >= 0)
+        {
+            received += s;
+            if (received > 10000000000)
+            {
+                this->callbacks();
+                received %= 10000000000;
+            }
         }
     }
 }

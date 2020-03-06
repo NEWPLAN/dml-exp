@@ -6,7 +6,7 @@
 #include <vector>
 #include <functional>
 #include <condition_variable>
-#include <mylogs.h>
+//#include <mylogs.h>
 
 template <typename T>
 class BlockingQueue
@@ -30,7 +30,7 @@ public:
     std::unique_lock<std::mutex> lock(mutex_);
     while (queue_.empty())
     {
-      LOG_EVERY_N(INFO, 10000) << log_on_wait;
+      //LOG_EVERY_N(INFO, 10000) << log_on_wait;
       condition_.wait(lock);
     }
     T t = queue_.front();

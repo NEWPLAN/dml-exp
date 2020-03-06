@@ -3,6 +3,8 @@
 #include "ATimer.h"
 #include "utils.h"
 
+#include "test.h"
+
 // #include <unistd.h>
 // #include <sys/syscall.h>
 
@@ -68,74 +70,12 @@ void do_init(newplan::ThreadPool &context, int *data, int data_size)
 #define KB 1000
 int main(int argc, char const *argv[])
 {
+	std::string ip_prefix("12.12.12.");
+	std::cout << "node ID: " << ip_parser(ip_prefix.c_str(), 9) << std::endl;
+	Solution *solution = new Solution();
+	solution->setup_network("12.12.12.111", 1234);
+	solution->setup_computation();
+	solution->run();
 
-	float *result;
-	float *data[5];
-
-	int size = 1000 * KB;
-	int num_tensor = 2;
-	{
-		std::cout << "tensor nums, and size to merge: ";
-		std::cin >> num_tensor >> size;
-	}
-	{ // init for evaluation
-		result = (float *)malloc(size * sizeof(float) + 100);
-		data[0] = (float *)malloc(size * sizeof(float) + 100);
-		data[1] = (float *)malloc(size * sizeof(float) + 100);
-		data[2] = (float *)malloc(size * sizeof(float) + 100);
-		data[3] = (float *)malloc(size * sizeof(float) + 100);
-		data[4] = (float *)malloc(size * sizeof(float) + 100);
-		for (int i = 0; i < size + 100; i++)
-		{
-			result[i] = 0;
-			data[0][i] = 1.1;
-			data[1][i] = 1.2;
-			data[2][i] = 1.3;
-			data[3][i] = 1.4;
-			data[4][i] = 1;
-		}
-	}
-	int *ramdom = new int[1024 * 1024 * 100];
-	int random_size = 1024 * 1024 * 100;
-
-	{
-		{
-			cuda_test_main();
-		}
-	}
-
-	newplan::ThreadPool tp(10);
-	std::mutex m;
-	for (int data_size = 1000; data_size <= size; data_size *= 10)
-	{
-		for (int ten_num = 2; ten_num <= num_tensor; ten_num++)
-		{
-			for (int loops = 0; loops < 5; loops++)
-			{
-				Timer t1;
-				t1.start();
-				{
-					do_test(tp, result, data, ten_num, data_size);
-				}
-				t1.stop();
-				std::cout << "num tensor: " << ten_num << ", size: " << data_size / 1000 << " KB, Time cost: " << t1.milliseconds() << " ms" << std::endl;
-
-				{
-					do_init(tp, ramdom, random_size);
-				}
-			}
-		}
-	}
-
-	for (int i = 0; i < size; i++)
-	{
-		if (result[i] != 6)
-		{
-			std::cerr << "error in posi: " << i << ", " << result[i] << std::endl;
-			return -1;
-		}
-	}
-
-	std::cout << "Done!" << std::endl;
-	return 0;
+	solution->wait_for_done();
 }

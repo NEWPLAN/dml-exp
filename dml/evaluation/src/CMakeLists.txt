@@ -20,9 +20,17 @@ include_directories(${SUB_MODULE_PATH} ./computation)
 link_directories(${SUB_MODULE_PATH}  ./computation)
 
 #添加一个子模块，编译到lib目录下去
-add_subdirectory(${SUB_MODULE_PATH}) # add a submodule, and compile it to the "build/lib"
-add_subdirectory(./computation) # add a submodule, and compile it to the "build/lib"
+add_subdirectory(${SUB_MODULE_PATH}) # build uitls subsystem
+add_subdirectory(./computation) # build computation subsystem
+add_subdirectory(./network) # build network subsystem
+add_subdirectory(./datasystem) # build data subsystem
+
 #设置编译目标
 add_executable(Hello ${SRC_LIST})
 #添加编译目标依赖
-target_link_libraries(Hello myutils cumerge pthread )
+target_link_libraries(Hello 
+                    myutils 
+                    cumerge 
+                    netsys
+                    datasys
+                    pthread )
