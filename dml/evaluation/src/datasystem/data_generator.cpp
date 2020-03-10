@@ -35,6 +35,7 @@ void DataGenerator::run()
             {
                 std::this_thread::sleep_for(std::chrono::microseconds(interval[0]));
                 channel_out->push(interval[1]);
+                this->event_signal->push(4); //send signal to forward engine
             }
 
         } while (true);

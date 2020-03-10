@@ -1,7 +1,7 @@
 # 按惯例，cmake的版本
 CMAKE_MINIMUM_REQUIRED(VERSION 3.0)
 # 项目名称
-PROJECT(datasubsystem)
+PROJECT(toposubsystem)
 
 find_package(Threads)
 
@@ -18,16 +18,16 @@ INCLUDE_DIRECTORIES(
 
 
 
-ADD_EXECUTABLE(data_benckmark
-    ./example/test_datasystem.cpp
+ADD_EXECUTABLE(topo_benckmark
+    ./example/example.cpp
 )
 
 
-ADD_LIBRARY(datasys SHARED 
-                data_generator.cpp
+ADD_LIBRARY(toposys SHARED 
+                topology.cpp
             )
-TARGET_LINK_LIBRARIES(datasys ${CMAKE_THREAD_LIBS_INIT})
+TARGET_LINK_LIBRARIES(toposys ${CMAKE_THREAD_LIBS_INIT})
 # 链接外部库，按需
-TARGET_LINK_LIBRARIES(data_benckmark 
+TARGET_LINK_LIBRARIES(topo_benckmark 
                         ${CMAKE_THREAD_LIBS_INIT}
-                        datasys)
+                        toposys)

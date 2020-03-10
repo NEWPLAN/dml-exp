@@ -6,6 +6,9 @@
 ComputeEngine::ComputeEngine()
 {
     this->callbacks = []() { std::cout << "Default ComputeEngine callback after merging" << std::endl; };
+    this->before_compute.push_back([]() { std::cout << "Default ComputeEngine callback before merging" << std::endl; });
+    this->after_compute.push_back([]() { std::cout << "Default ComputeEngine callback after merging" << std::endl; });
+
     std::cout << "ComputeEngine has been ctreated" << std::endl;
 }
 ComputeEngine::~ComputeEngine()
@@ -100,7 +103,7 @@ void ComputeEngine::run()
         {
             for (int ten_num = 2; ten_num <= tensor_num; ten_num++)
             {
-                for (int loops = 0; loops < 5; loops++)
+                for (int loops = 0; loops < 2; loops++)
                 {
                     Timer t1;
                     t1.start();
@@ -119,5 +122,29 @@ void ComputeEngine::run()
         }
         while (1)
             ;
+    });
+}
+
+void ComputeEngine::setup_channels(std::vector<BlockingQueue<int> *> channels)
+{
+    this->channels_ = channels;
+}
+
+void ComputeEngine::reset_workflow()
+{
+    daemon_thread = new std::thread([this]() {
+        do
+        {
+            for (auto &each : this->before_compute)
+            {
+                each();
+            }
+            std::cout << "Merging tensor here!" << std::endl;
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            for (auto &each : this->after_compute)
+            {
+                each();
+            }
+        } while (true);
     });
 }

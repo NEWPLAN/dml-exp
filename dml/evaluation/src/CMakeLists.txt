@@ -1,7 +1,7 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.0) #cmake版本要求
-project(Hello)
+project(Benchmark)
 
-message("Building make for Hello") #打印消息
+message("Building make for Benchmark") #打印消息
 message("add -DDYNAMIC_E=1 when build dynamic class E, the default is static")
 set(CMAKE_BUILD_TYPE "Debug")
 
@@ -9,7 +9,7 @@ set(SUB_MODULE_PATH "./utils")
 set(CMAKE_CXX_STANDARD 11) # 设置std=c++11
 
 # 设置debug或者release的编译参数
-set(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g -ggdb -fPIC")
+#set(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g -ggdb -fPIC")
 set(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -Os -Wall -fPIC")
 
 # collect all message to "SRC_LIST" <-- ./*.cpp
@@ -24,13 +24,15 @@ add_subdirectory(${SUB_MODULE_PATH}) # build uitls subsystem
 add_subdirectory(./computation) # build computation subsystem
 add_subdirectory(./network) # build network subsystem
 add_subdirectory(./datasystem) # build data subsystem
+add_subdirectory(./topology) # build data subsystem
 
 #设置编译目标
-add_executable(Hello ${SRC_LIST})
+add_executable(Benchmark ${SRC_LIST})
 #添加编译目标依赖
-target_link_libraries(Hello 
+target_link_libraries(Benchmark 
                     myutils 
                     cumerge 
                     netsys
                     datasys
+                    toposys
                     pthread )

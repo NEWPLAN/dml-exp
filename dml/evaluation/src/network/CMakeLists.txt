@@ -6,7 +6,7 @@ PROJECT(networksubsystem)
 find_package(Threads)
 
 # C++和CUDA的编译参数，可选。
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11 -Os")
 # 头文件路径，按需
 INCLUDE_DIRECTORIES(
     ./)
@@ -30,7 +30,9 @@ ADD_EXECUTABLE(client
 
 ADD_LIBRARY(netsys SHARED 
                 client.cpp
-                server.cpp)
+                server.cpp
+                tower.cpp
+                )
 
                 TARGET_LINK_LIBRARIES(netsys ${CMAKE_THREAD_LIBS_INIT})
 # 链接外部库，按需

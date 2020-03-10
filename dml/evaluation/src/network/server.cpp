@@ -20,9 +20,11 @@
 #include "server.h"
 #include <thread>
 #include <fcntl.h>
+#include "../utils/ATimer.h"
 
 TCPServer::TCPServer()
 {
+    this->recv_channel = new BlockingQueue<int>();
     this->callbacks = []() { std::cout << "Default server callbacks after receive" << std::endl; };
     //socket打开一个 网络通讯端口，其中AF_INET:表示IPV4，SOCK_STREAM：表示面向流的传输，
     //protocol参数默认选择为0
@@ -43,11 +45,15 @@ TCPServer::~TCPServer()
     std::cout << "On closing server..." << std::endl;
 }
 
+BlockingQueue<int> *TCPServer::get_recv_channel()
+{
+    return this->recv_channel;
+}
 void TCPServer::setup(const std::string ip, short port)
 {
     //socket打开一个 网络通讯端口，其中AF_INET:表示IPV4，SOCK_STREAM：表示面向流的传输，
     //protocol参数默认选择为0
-
+    this->port = port;
     struct sockaddr_in local;
     local.sin_family = AF_INET;
     local.sin_port = htons(port);
@@ -73,23 +79,73 @@ void TCPServer::setup(const std::string ip, short port)
 
 void TCPServer::start_service(int service_number)
 {
-    // //listen声明sock处于监听状态，并且最多允许5个客户端处于连接等待状态
-    // //如果收到更多的请求便忽略
-    // if (listen(this->server_socket, service_number) == -1) //add listener
-    // {
-    //     std::cerr << "On listen error" << std::endl;
-    //     exit(-3);
-    // }
-    std::cout << "On listen maximum connections: " << service_number << std::endl;
+    std::cout << "Server is expected to accept " << service_number << " connections" << std::endl;
+    if (connector_thread == nullptr)
+    {
+        connector_thread = new std::thread([this, service_number]() {
+            std::vector<BlockingQueue<int> *> sub_channels;
+            int served_number = 0;
+            while (served_number < service_number)
+            {
+                served_number++;
+
+                BlockingQueue<int> *tmp_channel = new BlockingQueue<int>();
+                sub_channels.push_back(tmp_channel);
+
+                struct sockaddr_in client;
+                socklen_t len = sizeof(client);
+                //accept阻塞式等待，用来接收连接
+                int new_fd = accept(this->server_socket, (struct sockaddr *)&client, &len);
+                if (new_fd < 0)
+                {
+                    std::cerr << "On accept error" << std::endl;
+                    continue;
+                }
+                printf("[Server: %d] received a connection from %s, (all: %d)\n", this->port, inet_ntoa(client.sin_addr), served_number);
+
+                worker_threads.push_back(new std::thread([this, new_fd, tmp_channel]() {
+                    //this->recv_message(new_fd, tmp_channel);
+                    recv_message_fix_size(new_fd, tmp_channel);
+                }));
+            }
+            std::cout << "Server has received " << service_number << " on port: " << this->port << ", chunk_size= " << chunk_size << std::endl;
+
+            int channel_size = sub_channels.size();
+            size_t *recv_data_records = new size_t[channel_size];
+            for (int index = 0; index < channel_size; index++)
+            {
+                // init the record for first read
+                recv_data_records[index] = 0;
+            }
+            do
+            {
+                //fetch data from sub channels in round robin;
+                for (int index = 0; index < channel_size; index++)
+                {
+                    while (recv_data_records[index] < chunk_size)
+                    {
+                        // if not data is available, wait for it
+                        recv_data_records[index] += sub_channels[index]->pop();
+                    }
+                    recv_data_records[index] -= chunk_size;
+                }
+                // all subthread has received one block, then sent to forwarding engine
+                this->recv_channel->push(chunk_size);
+                this->event_signal->push(this->signal_);
+            } while (true);
+        });
+    }
+    else
+    {
+        std::cout << "Already create a connector" << std::endl;
+    }
+}
+
+void TCPServer::start_service2()
+{
     if (connector_thread == nullptr)
     {
         connector_thread = new std::thread([this]() {
-            typedef struct 
-            {
-                std::string ip;
-                short port;
-            }ClientInfo;
-            std::vector<ClientInfo> client_groups;
             while (1)
             {
                 struct sockaddr_in client;
@@ -102,19 +158,14 @@ void TCPServer::start_service(int service_number)
                     continue;
                 }
                 printf("[Server] received connection: %s:%d\n", inet_ntoa(client.sin_addr), ntohs(client.sin_port));
-                {
-                ClientInfo new_client;
-                new_client.ip=std::string(inet_ntoa(client.sin_addr));
-                new_client.port=ntohs(client.sin_port);
-                client_groups.push_back(std::move(new_client));
-                }
-                
+
                 worker_threads.push_back(new std::thread([this, new_fd](){
-                    this->handle_request(new_fd);
+                    this->recv_message(new_fd,nullptr);
                 }));
-                //return 0;
+                worker_threads.push_back(new std::thread([this, new_fd](){
+                    this->send_message(new_fd);
+                }));
             } });
-        // connector_thread->join();
     }
     else
     {
@@ -122,40 +173,121 @@ void TCPServer::start_service(int service_number)
     }
 }
 
-void TCPServer::handle_request(int fd)
+void TCPServer::send_message(int socket_fd)
 {
-    int new_fd = fd;
-    printf("new_fd=%d\n", new_fd);
-    size_t received = 0;
-    while (1)
+    char buff[1024 * 1024];
+    sprintf(buff, "%d", 1024 * 1024);
+    do
     {
-        char buffer[1024 * 1024];
-        ssize_t s = read(new_fd, buffer, sizeof(buffer));
-        if (s == -1)
+        //std::cout << "server send message to client" << std::endl;
+        int send_size = 0;
+        send_size = write(socket_fd, buff, 1024 * 1024);
+        if (send_size != 1024 * 1024)
         {
-            perror("read");
+            std::cout << "send size is not right: " << send_size << std::endl;
         }
-        if (s > 0)
-        {
+    } while (true);
+}
 
-            buffer[s] = '\0';
-            sprintf(buffer, "%ld", s);
-            //printf("client:%s\n", buffer);
-            write(new_fd, buffer, sizeof(int) + 1);
-        }
-        else
+int TCPServer::recv_message(int socket_fd, BlockingQueue<int> *queue)
+{
+    size_t buff_size = 1024 * 1024 * 100;
+    char *buff = new char[buff_size];
+    size_t received = 0;
+    Timer timer;
+    timer.start();
+    if (queue == nullptr)
+    {
+        std::cout << "error of the received message, no queue" << std::endl;
+        exit(-1);
+    }
+    int to_receive_bytes = chunk_size;
+    {
+        std::cout << "Server [" << this->port << "] has been ready to receive message, chunk size = " << chunk_size << std::endl;
+    }
+    if (chunk_size <= 0)
+    {
+        std::cout << "error in recv chunk_size: " << chunk_size << std::endl;
+        exit(0);
+    }
+    int recv_size = 0;
+    do
+    {
+        //std::cout << "Server recv from client" << std::endl;
+
+        //read, check, and put to channels
+        recv_size = read(socket_fd, buff, buff_size);
+        if (recv_size <= 0)
         {
-            printf("read done...break\n");
-            break;
+            std::cout << "recv error, received: " << recv_size << std::endl;
+            exit(-1);
         }
-        if (s >= 0)
+        received += recv_size;
+        if (received >= 10000000000)
         {
-            received += s;
-            if (received > 10000000000)
+            timer.stop();
+            std::cout << "[" << this->port << "]" << socket_fd << ": Server recv rate: " << 8 * received / 1000.0 / 1000 / 1000 / timer.seconds() << " Gbps" << std::endl;
+            //this->callbacks();
+            received %= 10000000000;
+            timer.start();
+        }
+        //std::cout << "to_receive_bytes: " << to_receive_bytes << std::endl;
+        queue->push(recv_size); // receive sub_thread-->receive main thread;
+    } while (true);
+}
+
+int TCPServer::recv_message_fix_size(int socket_fd, BlockingQueue<int> *queue)
+{
+    size_t buff_size = 1024 * 1024 * 100;
+    char *buff = new char[buff_size];
+    size_t received = 0;
+    Timer timer;
+    timer.start();
+    if (queue == nullptr)
+    {
+        std::cout << "error of the received message, no queue" << std::endl;
+        exit(-1);
+    }
+    int to_receive_bytes = chunk_size;
+    {
+        std::cout << "Server [" << this->port << "] has been ready to receive message, chunk size = " << chunk_size << std::endl;
+    }
+    if (chunk_size <= 0)
+    {
+        std::cout << "error in recv chunk_size: " << chunk_size << std::endl;
+        exit(0);
+    }
+    do
+    {
+        //std::cout << "Server recv from client" << std::endl;
+        to_receive_bytes = chunk_size;
+        int recv_size = 0;
+        while (to_receive_bytes > 0)
+        {
+            //recv_size = read(socket_fd, buff, to_receive_bytes);
+            recv_size = recv(socket_fd, buff, to_receive_bytes, MSG_WAITALL);
+
+            if (recv_size <= 0)
             {
-                this->callbacks();
+                std::cout << "recv error, received: " << recv_size << std::endl;
+                exit(-1);
+            }
+            to_receive_bytes -= recv_size;
+            //if (recv_size == 0)
+            //std::cout << "received in bytes: " << recv_size << std::endl;
+
+            received += recv_size;
+            if (received >= 10000000000)
+            {
+                timer.stop();
+                std::cout << "[" << this->port << "]" << socket_fd << ": Server recv rate: " << 8 * received / 1000.0 / 1000 / 1000 / timer.seconds() << " Gbps" << std::endl;
+                //this->callbacks();
                 received %= 10000000000;
+                timer.start();
             }
         }
-    }
+        //std::cout << "to_receive_bytes: " << to_receive_bytes << std::endl;
+        queue->push(chunk_size); // receive sub_thread-->receive main thread;
+
+    } while (true);
 }
