@@ -7,7 +7,7 @@ Benchmark::Benchmark(int chunk_size)
     std::cout << "\n\n======= Building Benchmark =======" << std::endl;
     data_generator = new DataGenerator();
     aggregator = new Aggregator();
-    topo = new Topology();
+    topo = new Topology("/home/newplan/program/dml/evaluation/src/topology/topo.txt");
 
     to_up_stream = new Tower(UPPER_STREAM);
     to_down_stream = new Tower(DOWN_STREAM);
@@ -23,7 +23,8 @@ Benchmark::Benchmark(int chunk_size)
         to_down_stream->register_signal_event(&(this->event_siganl));
     }
 
-    std::cout << "Test case has been built on node: " << topo->get_id() << std::endl;
+    LOG(INFO) << "Test case has been built on node: " << topo->get_id()
+              << ", and the root ip is: " << topo->get_root_ip();
     //while (1)
     {
         std::cout << "Back to main thread in building benchmark" << std::endl;
@@ -89,10 +90,16 @@ void Benchmark::setup_network(std::string ip, short port)
     std::cout << "=========setup network system=========="
               << std::endl;
 
-    topo->load_topology("/home/newplan/program/dml/evaluation/src/topology/topo.txt");
+    //topo->load_topology();
 
     {
         this->node_size = topo->get_rank_size();
+        if (this->node_size <= 0 || topo->get_upper_stream().size() <= 0)
+        {
+            std::cout << "This node is not ready to join cluster" << std::endl;
+            exit(-1);
+        }
+        this->node_size /= topo->get_upper_stream().size();
         if (node_size <= 0)
         {
             std::cout << "error of cluster configuration, node size: " << node_size << std::endl;
@@ -148,7 +155,7 @@ void Benchmark::setup_aggregator()
 
 void Benchmark::setup_dataGenetator()
 {
-    std::cout << "setup dataGenerator" << std::endl;
+    LOG(INFO) << "setup dataGenerator";
 
     //BlockingQueue<int> control_channel, data_channel;
     BlockingQueue<int> *control_channel = new BlockingQueue<int>();
@@ -174,14 +181,14 @@ void Benchmark::setup_dataGenetator()
         {
             channels[0]->push(1);
             int data = channels[1]->pop();
-            std::cout << "Receive data: " << data << std::endl;
+            LOG(INFO) << "Receive data: " << data ;
         } while (true); });
     }
 }
 
 void Benchmark::wait_for_done()
 {
-    std::cout << "Main thread is running in background" << std::endl;
+    LOG(INFO) << "Main thread is running in background";
     do
     {
         std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -194,7 +201,7 @@ void Benchmark::forward_engine_start()
 {
     int message_signal = -1;
     int received_data = 0;
-    //for (int index = 0; index < 50; index++)
+    //for (int index = 0; index < 10; index++)
     {
         to_up_stream->send_message(this->chunk_size);
     }
@@ -210,12 +217,26 @@ void Benchmark::forward_engine_start()
     // to_down_stream->send_message(1000000);
     // to_down_stream->send_message(1000000);
     {
-        std::cout << "In forward_engine, node_size=" << this->node_size << ", chunk size: " << this->chunk_size << std::endl;
+        LOG(INFO) << "In forward_engine, node_size=" << this->node_size
+                  << ", chunk size: " << this->chunk_size;
     }
     Timer timer;
     timer.start();
     size_t bytes_received = 0;
     int reduce_scatter = 0;
+    int upper_node_num = topo->get_upper_stream().size();
+
+    int is_ring = upper_node_num == 1 ? 1 : 0;
+    if (!is_ring)
+    {
+        LOG(INFO) << "PS will pipeline!";
+        for (int i = 0; i < 50 - 1; i++)
+            to_up_stream->send_message(this->chunk_size);
+    }
+    else
+    {
+        LOG(INFO) << "Runing in Ring Allreduce";
+    }
     do
     {
         message_signal = this->event_siganl.pop();
@@ -223,20 +244,33 @@ void Benchmark::forward_engine_start()
         {
         case 1:
             received_data = aggregator->receive_message(0);
-            to_up_stream->send_message(this->chunk_size);
-
+            if (is_ring)
+                to_up_stream->send_message(this->chunk_size);
+            else
+            {
+                to_down_stream->send_message(this->chunk_size);
+            }
             break;
         case 2:
             received_data = to_down_stream->receive_message(0);
             bytes_received += received_data;
-            if (reduce_scatter < this->node_size - 1)
+            if (is_ring)
             {
-                aggregator->send_message(2, received_data / sizeof(float));
-                //to_up_stream->send_message(received_data);
+                if (reduce_scatter < this->node_size - 1)
+                {
+                    //LOG(INFO) << "Send to aggregator";
+                    aggregator->send_message(2, received_data / sizeof(float));
+                    //to_up_stream->send_message(received_data);
+                }
+                else
+                {
+                    to_up_stream->send_message(received_data);
+                }
             }
             else
             {
-                to_up_stream->send_message(received_data);
+                LOG(INFO) << "send to aggregator";
+                aggregator->send_message(upper_node_num + 1, received_data / sizeof(float));
             }
 
             reduce_scatter++;
@@ -245,7 +279,15 @@ void Benchmark::forward_engine_start()
         case 3:
             received_data = to_up_stream->receive_message(0);
             bytes_received += received_data;
-            to_down_stream->send_message(received_data);
+            if (is_ring)
+            {
+                to_down_stream->send_message(received_data);
+            }
+            else
+            {
+                // PS, launch the next message
+                to_up_stream->send_message(received_data);
+            }
             break;
         case 4:
             std::cout << "[Forward_engine]: Receive message from data generator" << std::endl;
@@ -254,10 +296,10 @@ void Benchmark::forward_engine_start()
             std::cerr << "[Forward_engine]: Receive unknown message: " << message_signal << std::endl;
             break;
         }
-        if (bytes_received > 10000000000)
+        if (bytes_received * upper_node_num > 10000000000)
         {
             timer.stop();
-            std::cout << "Total recv rate: " << 8 * bytes_received / 1000.0 / 1000 / 1000 / timer.seconds() << " Gbps" << std::endl;
+            LOG(INFO) << "Total recv rate: " << 8 * bytes_received * upper_node_num / 1000.0 / 1000 / 1000 / timer.seconds() << " Gbps";
             timer.start();
             bytes_received = 0;
         }

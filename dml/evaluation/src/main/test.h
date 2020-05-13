@@ -1,8 +1,8 @@
 #ifndef __NEWPLAN_TEST_H__
 #define __NEWPLAN_TEST_H__
 
-#include "../network/client.h"
-#include "../network/server.h"
+// #include "../network/tcp/client.h"
+// #include "../network/tcp/server.h"
 #include "../computation/tensor_merge.h"
 #include "../datasystem/data_generator.h"
 #include "../computation/aggregator.h"
@@ -10,6 +10,7 @@
 #include "../network/tower.h"
 #include <string>
 #include "../utils/blockingQueue.h"
+#include "../utils/logging.h"
 class Benchmark
 {
 public:

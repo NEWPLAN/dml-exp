@@ -3,8 +3,8 @@
 
 int main(int argc, char **argv)
 {
-    Topology *topo = new Topology();
-    topo->load_topology("/home/newplan/program/dml/evaluation/src/topology/topo.txt");
+    Topology *topo = new Topology("/home/newplan/program/dml/evaluation/src/topology/topo.txt");
+    //topo->load_topology();
     std::vector<int> upper = topo->get_upper_stream();
     std::vector<int> down = topo->get_down_stream();
     std::cout << "\nupper Stream: ";

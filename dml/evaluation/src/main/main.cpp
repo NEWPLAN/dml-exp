@@ -22,8 +22,10 @@ int main(int argc, char const *argv[])
 	test_unit->run();
 
 	test_unit->forward_engine_start();
-
 	test_unit->wait_for_done();
+	{
+		std::cout << "In main loop" << std::endl;
+	}
 
 	return 0;
 }

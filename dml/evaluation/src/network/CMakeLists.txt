@@ -9,8 +9,16 @@ find_package(Threads)
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11 -Os")
 # 头文件路径，按需
 INCLUDE_DIRECTORIES(
-    ./)
+    ./tcp/
+    ./rdma/
+    ./
+    )
 
+# aux_source_directory(
+#     ./tcp/
+#     ./rdma/
+#     ./
+# )
 
 # 库文件路径，按需
 #LINK_DIRECTORIES(/usr/lib
@@ -29,12 +37,13 @@ ADD_EXECUTABLE(client
 #                testcase.cpp)
 
 ADD_LIBRARY(netsys SHARED 
-                client.cpp
-                server.cpp
+                ./tcp/client.cpp
+                ./tcp/server.cpp
                 tower.cpp
                 )
 
-                TARGET_LINK_LIBRARIES(netsys ${CMAKE_THREAD_LIBS_INIT})
+TARGET_LINK_LIBRARIES(netsys ${CMAKE_THREAD_LIBS_INIT})
+
 # 链接外部库，按需
 TARGET_LINK_LIBRARIES(server 
                         ${CMAKE_THREAD_LIBS_INIT}

@@ -9,56 +9,15 @@
 #include <string.h>
 #include <arpa/inet.h>
 
-static int get_local_id(const char *ip_prefix, int ip_prefix_length)
+Topology::Topology(std::string path)
 {
-    struct ifaddrs *ifAddrStruct = NULL;
-    struct ifaddrs *ifa = NULL;
-    void *tmpAddrPtr = NULL;
-
-    int node_id = -1;
-
-    getifaddrs(&ifAddrStruct);
-
-    for (ifa = ifAddrStruct; ifa != NULL; ifa = ifa->ifa_next)
-    {
-        if (!ifa->ifa_addr)
-        {
-            continue;
-        }
-        if (ifa->ifa_addr->sa_family == AF_INET) // check it is IP4
-        {
-            // is a valid IP4 Address
-            tmpAddrPtr = &((struct sockaddr_in *)ifa->ifa_addr)->sin_addr;
-            char addressBuffer[INET_ADDRSTRLEN];
-            inet_ntop(AF_INET, tmpAddrPtr, addressBuffer, INET_ADDRSTRLEN);
-            if (strncmp(addressBuffer, ip_prefix, ip_prefix_length) == 0)
-            {
-                node_id = atoi(addressBuffer + ip_prefix_length);
-                printf("%s IP Address %s\n", ifa->ifa_name, addressBuffer);
-            }
-        }
-        else if (ifa->ifa_addr->sa_family == AF_INET6) // check it is IP6
-        {
-            continue;
-            // is a valid IP6 Address
-            tmpAddrPtr = &((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr;
-            char addressBuffer[INET6_ADDRSTRLEN];
-            inet_ntop(AF_INET6, tmpAddrPtr, addressBuffer, INET6_ADDRSTRLEN);
-            printf("%s IP Address %s\n", ifa->ifa_name, addressBuffer);
-        }
-    }
-    if (ifAddrStruct != NULL)
-    {
-        freeifaddrs(ifAddrStruct);
-    }
-
-    return node_id;
-}
-
-Topology::Topology()
-{
-    this->node_id = get_local_id("12.12.12.111", 9);
-    std::cout << "Building Topology ..." << std::endl;
+    this->ip_prefix = "12.12.12.1";
+    this->prefix_length = 24;
+    this->node_id = NetTool::get_node_id(ip_prefix.c_str(), prefix_length);
+    ip_prefix = NetTool::get_ip_prefix(ip_prefix.c_str(), prefix_length);
+    this->load_topology(path);
+    LOG(INFO) << "Building Topology on " << node_id;
+    LOG(INFO) << "Using ip prefix: " << ip_prefix;
 }
 
 Topology::~Topology()
@@ -102,9 +61,22 @@ void Topology::load_topology(std::string path)
     for (int index = 0; index < node_size; index++)
         for (int each_item = 0; each_item < node_size; each_item++)
         {
+
             if (this->adj_matrix[index][each_item] != 0)
+            {
+                if (this->root_id > index)
+                {
+                    this->root_id = index;
+                }
+                if (this->root_id > each_item)
+                {
+                    this->root_id = each_item;
+                }
                 involved_node++;
+            }
         }
+    this->root_id += 101;
+    LOG(INFO) << "The root_id is: " << this->root_id;
 
     // for (int index = 0; index < node_size; index++)
     // {

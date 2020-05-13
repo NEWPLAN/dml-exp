@@ -1,15 +1,16 @@
 #include "tower.h"
 #include <iostream>
+#include "../utils/logging.h"
 
 Tower::Tower(TYPE type)
 {
     this->type_ = type;
     this->server_guard = new TCPServer();
-    std::cout << "Building tower" << std::endl;
+    LOG(INFO) << "Building tower ";
 }
 Tower::~Tower()
 {
-    std::cout << "Destroy tower" << std::endl;
+    LOG(INFO) << "Destroy tower";
 }
 void Tower::send_message(int size)
 {
@@ -56,18 +57,17 @@ void Tower::build_network_system(std::string ip, int port)
         if (this->type_ == DOWN_STREAM)
         {
 
-            std::cout << "[Down]: On listening: " << port << std::endl;
+            LOG(INFO) << "[Down]: On listening: " << port;
         }
         else
         {
-
-            std::cout << "[Upper]: On listening: " << port << std::endl;
+            LOG(INFO) << "[Upper]: On listening: " << port;
         }
     }
     if (this->type_ == UPPER_STREAM) //upperstream-->downstream
     {
         TCPClient *tmp_client = new TCPClient();
-        std::cout << "[upperstream-->downstream]: On connecting: " << port + 1 << std::endl;
+        LOG(INFO) << "[upperstream-->downstream]: On connecting: " << port + 1;
         tmp_client->setup(ip, port + 1);
         this->client_group.push_back(tmp_client);
     }
@@ -105,7 +105,8 @@ void Tower::start_service()
             for (auto &upper_ip : this->ip_groups)
             {
                 TCPClient *tmp_client = new TCPClient();
-                std::cout << "[to upperstream]: On connecting: " << upper_ip << ":" << this->listen_port + 1 << std::endl;
+                LOG(INFO) << "[to upperstream]: On connecting: "
+                          << upper_ip << ":" << this->listen_port + 1;
                 tmp_client->setup(upper_ip, this->listen_port + 1);
                 this->client_group.push_back(tmp_client);
             }
@@ -117,12 +118,12 @@ void Tower::start_service()
 
         if (this->type_ == DOWN_STREAM)
         {
-            //return;
-            // reconnect from downstream-->upperstream;
             for (auto &down_ip : this->ip_groups)
             {
                 TCPClient *tmp_client = new TCPClient();
-                std::cout << "[to downstream]:On connecting: " << down_ip << ":" << this->listen_port - 1 << std::endl;
+                LOG(INFO) << "[to downstream]:On connecting: "
+                          << down_ip << ":" << this->listen_port - 1;
+
                 tmp_client->setup(down_ip, this->listen_port - 1);
                 tmp_client->start_service();
                 this->server_group.push_back(tmp_client);

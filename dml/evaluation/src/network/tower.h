@@ -1,10 +1,12 @@
 #ifndef __NEWPLAN_TOWER_H__
 #define __NEWPLAN_TOWER_H__
 
-#include "client.h"
-#include "server.h"
+#include "tcp/client.h"
+#include "tcp/server.h"
 #include "../utils/blockingQueue.h"
 #include <vector>
+// #include "rdma/RDMAServer.h"
+// #include "rdma/RDMAClient.h"
 
 typedef enum
 {
