@@ -1,0 +1,20 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+../topology/./topology.h
+vector
+-
+string
+-
+
+/home/caijunyao/RDMA_DML/DML-EXP/dml/evaluation/src/topology/example/example.cpp
+topology.h
+/home/caijunyao/RDMA_DML/DML-EXP/dml/evaluation/src/topology/example/topology.h
+iostream
+-
+

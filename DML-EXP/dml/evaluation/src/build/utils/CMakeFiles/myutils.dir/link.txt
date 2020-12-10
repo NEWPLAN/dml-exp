@@ -1,0 +1,1 @@
+/usr/bin/c++  -fPIC -g  -shared -Wl,-soname,libmyutils.so -o libmyutils.so CMakeFiles/myutils.dir/utils.cpp.o  -L/home/caijunyao/RDMA_DML/DML-EXP/dml/evaluation/src/./utils  -L/home/caijunyao/RDMA_DML/DML-EXP/dml/evaluation/src/./computation 

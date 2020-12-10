@@ -1,0 +1,36 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+.././utils/blockingQueue.h
+queue
+-
+string
+-
+vector
+-
+functional
+-
+condition_variable
+-
+
+../network/./client.h
+string
+-
+thread
+-
+functional
+-
+../utils/blockingQueue.h
+../network/utils/blockingQueue.h
+
+/home/caijunyao/RDMA_DML/DML-EXP/dml/evaluation/src/network/example/example_client.cpp
+stdio.h
+-
+client.h
+/home/caijunyao/RDMA_DML/DML-EXP/dml/evaluation/src/network/example/client.h
+
